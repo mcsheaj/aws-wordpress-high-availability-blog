@@ -487,8 +487,9 @@
                             "Ref": "SshSourceCidr"
                         },
                         "IpProtocol": "tcp",
-                        "FromPort": 2442,
-                        "ToPort": 2442
+                        "FromPort": 443,
+                        "ToPort": 443
+                        
                     }
                 ],
                 "Tags": [
