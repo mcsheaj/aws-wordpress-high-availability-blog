@@ -2,6 +2,17 @@
 
 cd /tmp
 
+# Create user accounts for administrators
+wget --no-cache https://raw.githubusercontent.com/mcsheaj/aws-ec2-ssh/master/install.sh
+chmod 755 install.sh
+yum -y install git
+if ! [ -z "${ADMIN_GROUP}" ]
+then
+    ./install.sh -i ${ADMIN_GROUP} -s ${ADMIN_GROUP}
+else 
+    ./install.sh -s '##ALL##'
+fi
+
 # Install jq
 yum -y install jq
 
@@ -19,18 +30,6 @@ then
     update-motd --disable
 else 
     echo "No MOTD_BANNER specified, skipping motd configuration"
-fi
-
-# Create user accounts for administrators
-wget --no-cache https://raw.githubusercontent.com/mcsheaj/aws-ec2-ssh/master/install.sh
-chmod 755 install.sh
-if ! [ -z "${ADMIN_GROUP}" ]
-then
-    yum -y install git
-    ./install.sh -i ${ADMIN_GROUP} -s ${ADMIN_GROUP}
-else 
-    yum -y install git
-    ./install.sh -s '##ALL##'
 fi
 
 # Update the instance name to include the stack name
