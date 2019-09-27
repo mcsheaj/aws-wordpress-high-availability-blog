@@ -22,16 +22,14 @@ else
 fi
 
 # Create user accounts for administrators
+wget --no-cache https://raw.githubusercontent.com/mcsheaj/aws-ec2-ssh/master/install.sh
+chmod 755 install.sh
 if ! [ -z "${ADMIN_GROUP}" ]
 then
     yum -y install git
-    wget --no-cache https://raw.githubusercontent.com/mcsheaj/aws-ec2-ssh/master/install.sh
-    chmod 755 install.sh
     ./install.sh -i ${ADMIN_GROUP} -s ${ADMIN_GROUP}
 else 
     yum -y install git
-    wget --no-cache https://raw.githubusercontent.com/mcsheaj/aws-ec2-ssh/master/install.sh
-    chmod 755 install.sh
     ./install.sh -s '##ALL##'
 fi
 
