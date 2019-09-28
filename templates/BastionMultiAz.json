@@ -477,7 +477,7 @@
             "Condition": "CreateSecurityGroup",
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
-                "GroupDescription": "Enable TCP on port 2442 (SSH)",
+                "GroupDescription": "Enable TCP on port 22 (SSH)",
                 "VpcId": {
                     "Ref": "VpcId"
                 },
@@ -487,8 +487,8 @@
                             "Ref": "SshSourceCidr"
                         },
                         "IpProtocol": "tcp",
-                        "FromPort": 2442,
-                        "ToPort": 2442
+                        "FromPort": 22,
+                        "ToPort": 22
                         
                     }
                 ],

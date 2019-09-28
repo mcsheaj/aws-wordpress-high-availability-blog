@@ -2,6 +2,14 @@
 
 cd /tmp
 
+# Populate some variables from meta-data
+INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)
+REGION=$(curl http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}')
+
+# Create a bootstrap tag
+BOOTSTRAP=$(date +"BEGIN: %Y-%m-%d %H:%M:%S %Z")
+aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Bootstrap,Value=${BOOTSTRAP} --region ${REGION}
+
 # Create user accounts for administrators
 wget --no-cache https://raw.githubusercontent.com/mcsheaj/aws-ec2-ssh/master/install.sh
 chmod 755 install.sh
@@ -12,13 +20,13 @@ then
 else 
     ./install.sh -s '##ALL##'
 fi
+BOOTSTRAP=$(date +"SSHEC2: %Y-%m-%d %H:%M:%S %Z")
+aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Bootstrap,Value=${BOOTSTRAP} --region ${REGION}
 
 # Install jq
 yum -y install jq
 
-# Populate some variables from meta-data and tags
-INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)
-REGION=$(curl http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
+# Populate some variables from CLI (need jq first)
 NAME=$(aws ec2 describe-tags --region us-east-1 --filters "Name=key,Values=Name" "Name=resource-id,Values=${INSTANCE_ID}" | jq .Tags[0].Value -r)
 STACK_NAME=$(aws ec2 describe-tags --region us-east-1 --filters "Name=key,Values=StackName" "Name=resource-id,Values=${INSTANCE_ID}" | jq .Tags[0].Value -r)
 
@@ -36,20 +44,13 @@ fi
 if [[ ${NAME} != *-${STACK_NAME} ]]
 then
     NEW_NAME="${NAME}-${STACK_NAME}"
-    aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Name,Value=$NEW_NAME --region $REGION
+    aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Name,Value=$NEW_NAME --region ${REGION}
 else
     NEW_NAME=${NAME}
 fi
 
-# Print a list of open ports
-lsof -i -n -P
-
 # Run system updates
 yum -y update
-
-# Delete the ec2-user and its home directory
-userdel ec2-user || true
-rm -rf /home/ec2-user || true
 
 # Call cfn-init, which reads the launch configration metadata and uses it to
 # configure and runs cfn-hup as a service, so we can get a script run on updates to the metadata
@@ -57,3 +58,7 @@ rm -rf /home/ec2-user || true
 
 # Send a signal indicating we're done
 /opt/aws/bin/cfn-signal -e $? --stack ${STACK_NAME} --resource BastionScalingGroup --region ${REGION} || true
+
+# Update the bootstrap tag
+BOOTSTRAP=$(date +"END: %Y-%m-%d %H:%M:%S %Z")
+aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Bootstrap,Value=${BOOTSTRAP} --region ${REGION}
