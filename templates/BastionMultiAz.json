@@ -808,7 +808,7 @@
                                     "Ref": "MotdBanner"
                                 },
                                 "\n",
-                                "wget --no-cache -O /tmp/bootstrap-bastion.sh https://raw.githubusercontent.com/mcsheaj/wordpress-high-availability-blog/master/bootstrap/bootstrap-bastion.sh \n",
+                                "wget --no-cache -O /tmp/bootstrap-bastion.sh https://raw.githubusercontent.com/mcsheaj/wordpress-high-availability-blog/master/scripts/bootstrap-bastion.sh \n",
                                 "chmod 700 /tmp/bootstrap-bastion.sh\n",
                                 "/tmp/bootstrap-bastion.sh\n"
                             ]
