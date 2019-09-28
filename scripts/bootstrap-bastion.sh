@@ -44,7 +44,7 @@ fi
 if [[ ${NAME} != *-${STACK_NAME} ]]
 then
     NEW_NAME="${NAME}-${STACK_NAME}"
-    aws ec2 create-tags --resources ${INSTANCE_ID} --tags "Key=Name,Value=$NEW_NAME"--region ${REGION}
+    aws ec2 create-tags --resources ${INSTANCE_ID} --tags "Key=Name,Value=$NEW_NAME" --region ${REGION}
 else
     NEW_NAME=${NAME}
 fi
