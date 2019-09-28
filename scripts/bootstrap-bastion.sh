@@ -20,7 +20,7 @@ then
 else 
     ./install.sh -s '##ALL##'
 fi
-BOOTSTRAP=$(date +"SSHEC2: %Y-%m-%d %H:%M:%S %Z")
+BOOTSTRAP=$(date +"${BOOTSTRAP}; SSHEC2: %Y-%m-%d %H:%M:%S %Z")
 aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Bootstrap,Value=${BOOTSTRAP} --region ${REGION}
 
 # Install jq
@@ -60,5 +60,5 @@ yum -y update
 /opt/aws/bin/cfn-signal -e $? --stack ${STACK_NAME} --resource BastionScalingGroup --region ${REGION} || true
 
 # Update the bootstrap tag
-BOOTSTRAP=$(date +"END: %Y-%m-%d %H:%M:%S %Z")
+BOOTSTRAP=$(date +"${BOOTSTRAP}; END: %Y-%m-%d %H:%M:%S %Z")
 aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Bootstrap,Value=${BOOTSTRAP} --region ${REGION}
