@@ -8,7 +8,7 @@ REGION=$(curl http://169.254.169.254/latest/dynamic/instance-identity/document|g
 
 # Create a bootstrap tag
 BOOTSTRAP=$(date +"BEGIN: %Y-%m-%d %H:%M:%S %Z")
-aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Bootstrap,Value=${BOOTSTRAP} --region ${REGION}
+aws ec2 create-tags --resources ${INSTANCE_ID} --tags "Key=Bootstrap,Value=${BOOTSTRAP}" --region ${REGION}
 
 # Create user accounts for administrators
 wget --no-cache https://raw.githubusercontent.com/mcsheaj/aws-ec2-ssh/master/install.sh
@@ -21,7 +21,7 @@ else
     ./install.sh -s '##ALL##'
 fi
 BOOTSTRAP=$(date +"${BOOTSTRAP}; SSHEC2: %Y-%m-%d %H:%M:%S %Z")
-aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Bootstrap,Value=${BOOTSTRAP} --region ${REGION}
+aws ec2 create-tags --resources ${INSTANCE_ID} --tags "Key=Bootstrap,Value=${BOOTSTRAP}" --region ${REGION}
 
 # Install jq
 yum -y install jq
@@ -44,7 +44,7 @@ fi
 if [[ ${NAME} != *-${STACK_NAME} ]]
 then
     NEW_NAME="${NAME}-${STACK_NAME}"
-    aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Name,Value=$NEW_NAME --region ${REGION}
+    aws ec2 create-tags --resources ${INSTANCE_ID} --tags "Key=Name,Value=$NEW_NAME"--region ${REGION}
 else
     NEW_NAME=${NAME}
 fi
@@ -61,4 +61,4 @@ yum -y update
 
 # Update the bootstrap tag
 BOOTSTRAP=$(date +"${BOOTSTRAP}; END: %Y-%m-%d %H:%M:%S %Z")
-aws ec2 create-tags --resources ${INSTANCE_ID} --tags Key=Bootstrap,Value=${BOOTSTRAP} --region ${REGION}
+aws ec2 create-tags --resources ${INSTANCE_ID} --tags "Key=Bootstrap,Value=${BOOTSTRAP}" --region ${REGION}
