@@ -477,7 +477,7 @@
             "Condition": "CreateSecurityGroup",
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
-                "GroupDescription": "Enable TCP on port 22 (SSH)",
+                "GroupDescription": "Enable TCP on port 433 (SSH)",
                 "VpcId": {
                     "Ref": "VpcId"
                 },
@@ -487,8 +487,8 @@
                             "Ref": "SshSourceCidr"
                         },
                         "IpProtocol": "tcp",
-                        "FromPort": 22,
-                        "ToPort": 22
+                        "FromPort": 443,
+                        "ToPort": 433
                         
                     }
                 ],
@@ -796,7 +796,7 @@
                             [
                                 "#!/bin/bash -xe\n",
                                 "\n",
-                                "echo UserDataVersion=4",
+                                "echo UserDataVersion=5",
                                 "\n",
                                 "export ADMIN_GROUP=",
                                 {
