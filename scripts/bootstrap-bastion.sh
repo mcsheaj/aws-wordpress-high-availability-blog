@@ -93,6 +93,10 @@ sed -i "s/^\[sshd\]/[sshd]\nenabled=true/" /etc/fail2ban/jail.local
 sed -i "s/port *= *ssh/port    = 443/" /etc/fail2ban/jail.local
 systemctl restart fail2ban
 
+# Shutdown RPC bind (used for NFS, not need on this server)
+systemctl stop rpcbind
+systemctl disable rpcbind
+
 # Run system updates
 yum -y update
 
