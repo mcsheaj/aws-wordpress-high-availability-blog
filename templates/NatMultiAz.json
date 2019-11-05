@@ -1,0 +1,870 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "AWS CloudFormation template for a self-healing NAT instance (AWS Linux 2). Uses a script derived from Shing Chen's blog post 'AWS Auto-healing VPC NAT Instance' (https://schen1628.wordpress.com/2015/05/21/aws-auto-healing-vpc-nat-instance/) to set the default route for private networks. Also uses aws_ec2_ssh (Michael Wittig, https://github.com/widdix/aws-ec2-ssh) to create administrators accounts and setup SSH keys from their CodeCommit keys.",
+    "Metadata": {
+        "LICENSE": "MIT License, Copyright (c) 2019 Joe McShea, https://github.com/mcsheaj/wordpress-high-availability-blog/blob/master/LICENSE",
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Virtual Private Cloud Settings"
+                    },
+                    "Parameters": [
+                        "VpcId",
+                        "VpcCidr",
+                        "PublicSubnets"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Instance Settings"
+                    },
+                    "Parameters": [
+                        "InstanceType",
+                        "InstanceCapacity"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Security Settings"
+                    },
+                    "Parameters": [
+                        "AdministratorsGroup",
+                        "AlternativeIAMRole",
+                        "AlternativeSecurityGroupId",
+                        "MotdBanner"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "VpcId": {
+                    "default": "Virtual Private Cloud"
+                },
+                "VpcCidr": {
+                    "default": "VPC CIDR Range"
+                },
+                "PublicSubnets": {
+                    "default": "Public Subnets"
+                },
+                "PublicSubnetBCIDR": {
+                    "default": "Instance Type"
+                },
+                "InstanceCapacity": {
+                    "default": "Instance Capacity"
+                },
+                "AdministratorsGroup": {
+                    "default": "Administrators IAM Group"
+                },
+                "AlternativeIAMRole": {
+                    "default": "Alt EC2 IAM Role"
+                },
+                "AlternativeSecurityGroupId": {
+                    "default": "Alt Security Group Id"
+                },
+
+                "MotdBanner": {
+                    "default": "Login Banner"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "VpcId": {
+            "Type": "AWS::EC2::VPC::Id",
+            "Description": "VpcId of your existing Virtual Private Cloud (VPC)",
+            "ConstraintDescription": "Must be the VPC Id of an existing Virtual Private Cloud."
+        },
+        "VpcCidr": {
+            "Type": "String",
+            "Description": "the CIDR address range of the Virtual Private Cloud (VPC)",
+            "ConstraintDescription": "Must be the VPC CIDR range of an existing Virtual Private Cloud."
+        },
+        "PublicSubnets": {
+            "Type": "List<AWS::EC2::Subnet::Id>",
+            "Description": "The list of public SubnetIds in your Virtual Private Cloud (VPC)",
+            "ConstraintDescription": "Should be a list of at least two existing subnets associated with two different availability zones. They should be residing in the selected Virtual Private Cloud."
+        },
+        "InstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "t3.nano",
+            "AllowedValues": [
+                "t1.micro",
+                "t2.nano",
+                "t2.micro",
+                "t2.small",
+                "t2.medium",
+                "t2.large",
+                "t3.nano",
+                "t3.micro",
+                "t3.small",
+                "t3.medium",
+                "t3.large",
+                "m1.small",
+                "m1.medium",
+                "m1.large",
+                "m1.xlarge",
+                "m2.xlarge",
+                "m2.2xlarge",
+                "m2.4xlarge",
+                "m3.medium",
+                "m3.large",
+                "m3.xlarge",
+                "m3.2xlarge",
+                "m4.large",
+                "m4.xlarge",
+                "m4.2xlarge",
+                "m4.4xlarge",
+                "m4.10xlarge",
+                "c1.medium",
+                "c1.xlarge",
+                "c3.large",
+                "c3.xlarge",
+                "c3.2xlarge",
+                "c3.4xlarge",
+                "c3.8xlarge",
+                "c4.large",
+                "c4.xlarge",
+                "c4.2xlarge",
+                "c4.4xlarge",
+                "c4.8xlarge",
+                "r3.large",
+                "r3.xlarge",
+                "r3.2xlarge",
+                "r3.4xlarge",
+                "r3.8xlarge",
+                "i2.xlarge",
+                "i2.2xlarge",
+                "i2.4xlarge",
+                "i2.8xlarge",
+                "d2.xlarge",
+                "d2.2xlarge",
+                "d2.4xlarge",
+                "d2.8xlarge",
+                "hi1.4xlarge",
+                "hs1.8xlarge",
+                "cr1.8xlarge",
+                "cc2.8xlarge",
+                "cg1.4xlarge"
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        },
+        "InstanceCapacity": {
+            "Default": "1",
+            "Description": "The initial number of instances",
+            "Type": "Number",
+            "MinValue": "0",
+            "MaxValue": "1",
+            "ConstraintDescription": "Must be between 0 and 1 EC2 instances. Zero is allowed because we may only want to run one of these when performing administration, instead of 24/7 365."
+        },
+        "AdministratorsGroup": {
+            "Type": "String",
+            "Description": "Name of an IAM group from which user accounts will be created and keys copied if they've configured a CodeCommit key (required). By default, aws-ec2-ssh will pull in all IAM accounts as local accounts. I'd prefer to only pull IAM accounts from a particular IAM group, so this template won't even work if this isn't the name of a real IAM group (or at least, aws-ec2-ssh won't work).",
+            "ConstraintDescription": "must be the name of a valid IAM group, and if none of the users have CodeCommit keys there will be no way to connect to instances"
+        },
+        "AlternativeIAMRole": {
+            "Description": "Specify an existing IAM Role name to attach to the NAT, if left blank a new role will be created.",
+            "Default": "",
+            "Type": "String"
+        },
+        "AlternativeSecurityGroupId": {
+            "Description": "Specify an existing Security Group Id to attach to the NAT, if left blank a new security Group will be created.",
+            "Default": "",
+            "Type": "String"
+        },
+        "MotdBanner": {
+            "Default": "https://raw.githubusercontent.com/mcsheaj/wordpress-high-availability-blog/master/scripts/motd.sh",
+            "Description": "Banner text to display upon login.",
+            "Type": "String"
+        }
+    },
+    "Rules": {
+        "SubnetsInVPC": {
+            "Assertions": [
+                {
+                    "Assert": {
+                        "Fn::EachMemberIn": [
+                            {
+                                "Fn::ValueOfAll": [
+                                    "AWS::EC2::Subnet::Id",
+                                    "VpcId"
+                                ]
+                            },
+                            {
+                                "Fn::RefAll": "AWS::EC2::VPC::Id"
+                            }
+                        ]
+                    },
+                    "AssertDescription": "All subnets must exist in the VPC"
+                }
+            ]
+        }
+    },
+    "Mappings": {
+        "InstanceType2Architecture": {
+            "t1.micro": {
+                "Arch": "HVM64"
+            },
+            "t2.nano": {
+                "Arch": "HVM64"
+            },
+            "t2.micro": {
+                "Arch": "HVM64"
+            },
+            "t2.small": {
+                "Arch": "HVM64"
+            },
+            "t2.medium": {
+                "Arch": "HVM64"
+            },
+            "t2.large": {
+                "Arch": "HVM64"
+            },
+            "t3.nano": {
+                "Arch": "HVM64"
+            },
+            "t3.micro": {
+                "Arch": "HVM64"
+            },
+            "t3.small": {
+                "Arch": "HVM64"
+            },
+            "t3.medium": {
+                "Arch": "HVM64"
+            },
+            "t3.large": {
+                "Arch": "HVM64"
+            },
+            "m1.small": {
+                "Arch": "HVM64"
+            },
+            "m1.medium": {
+                "Arch": "HVM64"
+            },
+            "m1.large": {
+                "Arch": "HVM64"
+            },
+            "m1.xlarge": {
+                "Arch": "HVM64"
+            },
+            "m2.xlarge": {
+                "Arch": "HVM64"
+            },
+            "m2.2xlarge": {
+                "Arch": "HVM64"
+            },
+            "m2.4xlarge": {
+                "Arch": "HVM64"
+            },
+            "m3.medium": {
+                "Arch": "HVM64"
+            },
+            "m3.large": {
+                "Arch": "HVM64"
+            },
+            "m3.xlarge": {
+                "Arch": "HVM64"
+            },
+            "m3.2xlarge": {
+                "Arch": "HVM64"
+            },
+            "m4.large": {
+                "Arch": "HVM64"
+            },
+            "m4.xlarge": {
+                "Arch": "HVM64"
+            },
+            "m4.2xlarge": {
+                "Arch": "HVM64"
+            },
+            "m4.4xlarge": {
+                "Arch": "HVM64"
+            },
+            "m4.10xlarge": {
+                "Arch": "HVM64"
+            },
+            "c1.medium": {
+                "Arch": "HVM64"
+            },
+            "c1.xlarge": {
+                "Arch": "HVM64"
+            },
+            "c3.large": {
+                "Arch": "HVM64"
+            },
+            "c3.xlarge": {
+                "Arch": "HVM64"
+            },
+            "c3.2xlarge": {
+                "Arch": "HVM64"
+            },
+            "c3.4xlarge": {
+                "Arch": "HVM64"
+            },
+            "c3.8xlarge": {
+                "Arch": "HVM64"
+            },
+            "c4.large": {
+                "Arch": "HVM64"
+            },
+            "c4.xlarge": {
+                "Arch": "HVM64"
+            },
+            "c4.2xlarge": {
+                "Arch": "HVM64"
+            },
+            "c4.4xlarge": {
+                "Arch": "HVM64"
+            },
+            "c4.8xlarge": {
+                "Arch": "HVM64"
+            },
+            "g2.2xlarge": {
+                "Arch": "HVMG2"
+            },
+            "g2.8xlarge": {
+                "Arch": "HVMG2"
+            },
+            "r3.large": {
+                "Arch": "HVM64"
+            },
+            "r3.xlarge": {
+                "Arch": "HVM64"
+            },
+            "r3.2xlarge": {
+                "Arch": "HVM64"
+            },
+            "r3.4xlarge": {
+                "Arch": "HVM64"
+            },
+            "r3.8xlarge": {
+                "Arch": "HVM64"
+            },
+            "i2.xlarge": {
+                "Arch": "HVM64"
+            },
+            "i2.2xlarge": {
+                "Arch": "HVM64"
+            },
+            "i2.4xlarge": {
+                "Arch": "HVM64"
+            },
+            "i2.8xlarge": {
+                "Arch": "HVM64"
+            },
+            "d2.xlarge": {
+                "Arch": "HVM64"
+            },
+            "d2.2xlarge": {
+                "Arch": "HVM64"
+            },
+            "d2.4xlarge": {
+                "Arch": "HVM64"
+            },
+            "d2.8xlarge": {
+                "Arch": "HVM64"
+            },
+            "hi1.4xlarge": {
+                "Arch": "HVM64"
+            },
+            "hs1.8xlarge": {
+                "Arch": "HVM64"
+            },
+            "cr1.8xlarge": {
+                "Arch": "HVM64"
+            },
+            "cc2.8xlarge": {
+                "Arch": "HVM64"
+            }
+        },
+        "Region2ArchitectureAmi": {
+            "eu-north-1": {
+                "HVM64": "ami-3f36be41",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "ap-south-1": {
+                "HVM64": "ami-0d2692b6acea72ee6",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "eu-west-3": {
+                "HVM64": "ami-0adcddd3324248c4c",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "eu-west-2": {
+                "HVM64": "ami-0d8e27447ec2c8410",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "eu-west-1": {
+                "HVM64": "ami-0bbc25e23a7640b9b",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "ap-northeast-2": {
+                "HVM64": "ami-095ca789e0549777d",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "ap-northeast-1": {
+                "HVM64": "ami-0c3fd0f5d33134a76",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "sa-east-1": {
+                "HVM64": "ami-058943e7d9b9cabfb",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "ca-central-1": {
+                "HVM64": "ami-0d4ae09ec9361d8ac",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "ap-southeast-1": {
+                "HVM64": "ami-01f7527546b557442",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "ap-southeast-2": {
+                "HVM64": "ami-0dc96254d5535925f",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "eu-central-1": {
+                "HVM64": "ami-0cc293023f983ed53",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "us-east-1": {
+                "HVM64": "ami-0b898040803850657",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "us-east-2": {
+                "HVM64": "ami-0d8f6eb4f641ef691",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "us-west-1": {
+                "HVM64": "ami-056ee704806822732",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "us-west-2": {
+                "HVM64": "ami-082b5a644766e0e6f",
+                "HVMG2": "NOT_SUPPORTED"
+            }
+        }
+    },
+    "Conditions": {
+        "CreateIAMRole": {
+            "Fn::Equals": [
+                {
+                    "Ref": "AlternativeIAMRole"
+                },
+                ""
+            ]
+        },
+        "CreateSecurityGroup": {
+            "Fn::Equals": [
+                {
+                    "Ref": "AlternativeSecurityGroupId"
+                },
+                ""
+            ]
+        }
+    },
+    "Resources": {
+        "NatSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "ssh",
+                "VpcId": {
+                    "Ref": "VpcId"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 22,
+                        "ToPort": 22,
+                        "CidrIp": {
+                            "Ref": "VpcCidr"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 80,
+                        "ToPort": 80,
+                        "CidrIp": {
+                            "Ref": "VpcCidr"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 443,
+                        "ToPort": 443,
+                        "CidrIp": {
+                            "Ref": "VpcCidr"
+                        }
+                    },
+                    {
+                        "IpProtocol": "icmp",
+                        "FromPort": -1,
+                        "ToPort": -1,
+                        "CidrIp": {
+                            "Ref": "VpcCidr"
+                        }
+                    }
+                ],
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 80,
+                        "ToPort": 80,
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 443,
+                        "ToPort": 443,
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "icmp",
+                        "FromPort": -1,
+                        "ToPort": -1,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "NatSG"
+                    },
+                    {
+                        "Key": "StackName",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName}"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ]
+            }
+        },
+        "NatProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Roles": [
+                    {
+                        "Fn::If": [
+                            "CreateIAMRole",
+                            {
+                                "Ref": "NatRole"
+                            },
+                            {
+                                "Ref": "AlternativeIAMRole"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "NatRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "ec2.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "IP_Nat_Iam",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "iam:ListUsers",
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:ListSSHPublicKeys",
+                                        "iam:GetSSHPublicKey"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:user/*"
+                                    }
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "iam:GetGroup",
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:group/${AdministratorsGroup}"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "PolicyName": "IP_Nat_Ec2",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:DescribeTags",
+                                        "ec2:ModifyInstanceAttribute",
+                                        "ec2:DescribeRouteTables"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:CreateTags"
+                                    ],
+                                    "Resource": "*",
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "ec2:ResourceTag/StackName": {
+                                                "Fn::Sub": "${AWS::StackName}"
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:CreateRoute",
+                                        "ec2:DeleteRoute",
+                                        "ec2:ReplaceRoute"
+                                    ],
+                                    "Resource": "*",
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "ec2:ResourceTag/Network": "Private"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "NatScalingGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "VPCZoneIdentifier": {
+                    "Ref": "PublicSubnets"
+                },
+                "LaunchConfigurationName": {
+                    "Ref": "LaunchConfig"
+                },
+                "MinSize": {
+                    "Ref": "InstanceCapacity"
+                },
+                "MaxSize": "5",
+                "DesiredCapacity": {
+                    "Ref": "InstanceCapacity"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Nat",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "StackName",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName}"
+                        },
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public",
+                        "PropagateAtLaunch": true
+                    }
+                ]
+            },
+            "CreationPolicy": {
+              "ResourceSignal": {
+                "Count": {
+                    "Ref": "InstanceCapacity"
+                },
+                "Timeout": "PT15M"
+              }
+            },
+            "UpdatePolicy": {
+                "AutoScalingRollingUpdate": {
+                    "MinInstancesInService": {
+                        "Ref": "InstanceCapacity"
+                    },
+                    "MaxBatchSize": "1",
+                    "PauseTime": "PT15M",
+                    "WaitOnResourceSignals": "true"
+                }
+            }
+        },
+        "LaunchConfig": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "configSets": {
+                        "cfn_install": [
+                            "install_cfn"
+                        ]
+                    },
+                    "install_cfn": {
+                        "files": {
+                            "/etc/cfn/cfn-hup.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "[main]\n",
+                                            "stack=",
+                                            {
+                                                "Ref": "AWS::StackId"
+                                            },
+                                            "\n",
+                                            "region=",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "\n"
+                                        ]
+                                    ]
+                                },
+                                "mode": "000400",
+                                "owner": "root",
+                                "group": "root"
+                            },
+                            "/etc/cfn/hooks.d/cfn-auto-reloader.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "[cfn-auto-reloader-hook]\n",
+                                            "triggers=post.update\n",
+                                            "path=Resources.LaunchConfig.Metadata.AWS::CloudFormation::Init\n",
+                                            "action=/sbin/aws-update-nat.sh\n"
+                                        ]
+                                    ]
+                                },
+                                "mode": "000400",
+                                "owner": "root",
+                                "group": "root"
+                            },
+                            "/sbin/aws-update-nat.sh": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "#!/bin/bash -xe\n",
+                                            "\n",
+                                            "echo $1\n",
+                                            "\n",
+                                            "# Update this script before updating the stack to perform custom logic within 15 minutes of the update\n",
+                                            "yum -y update\n"
+                                        ]
+                                    ]
+                                },
+                                "mode": "000700",
+                                "owner": "root",
+                                "group": "root"              
+                            }
+                        },
+                        "commands" : {
+                            "aws_update_nat" : {
+                                "command" : "/sbin/aws-update-nat.sh MetadataVersion=1"
+                            }
+                        },
+                        "services": {
+                            "sysvinit": {
+                                "cfn-hup": {
+                                    "enabled": "true",
+                                    "ensureRunning": "true",
+                                    "files": [
+                                        "/etc/cfn/cfn-hup.conf",
+                                        "/etc/cfn/hooks.d/cfn-auto-reloader.conf",
+                                        "/sbin/aws-update-nat.sh"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties": {
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "Region2ArchitectureAmi",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        {
+                            "Fn::FindInMap": [
+                                "InstanceType2Architecture",
+                                {
+                                    "Ref": "InstanceType"
+                                },
+                                "Arch"
+                            ]
+                        }
+                    ]
+                },
+                "InstanceType": {
+                    "Ref": "InstanceType"
+                },
+                "InstanceMonitoring": false,
+                "IamInstanceProfile": {
+                    "Ref": "NatProfile"
+                },
+                "SecurityGroups": [
+                    {
+                        "Fn::If": [
+                            "CreateSecurityGroup",
+                            {
+                                "Ref": "NatSecurityGroup"
+                            },
+                            {
+                                "Ref": "AlternativeSecurityGroupId"
+                            }
+                        ]
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -xe\n",
+                                "\n",
+                                "echo UserDataVersion=1",
+                                "\n",
+                                "export ADMIN_GROUP=",
+                                {
+                                    "Ref": "AdministratorsGroup"
+                                },
+                                "\n",
+                                "export MOTD_BANNER=",
+                                {
+                                    "Ref": "MotdBanner"
+                                },
+                                "\n",
+                                "wget --no-cache -O /tmp/bootstrap-nat.sh https://raw.githubusercontent.com/mcsheaj/wordpress-high-availability-blog/master/scripts/bootstrap-nat.sh\n",
+                                "chmod 700 /tmp/bootstrap-nat.sh\n",
+                                "/tmp/bootstrap-nat.sh\n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}
