@@ -4,7 +4,7 @@ cd /tmp
 
 # Populate some variables from meta-data and tags
 INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)
-REGION=$(curl http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
+REGION=$(curl http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}')
 
 # Create a bootstrap tag
 BOOTSTRAP=$(date +"BEGIN: %Y-%m-%d %H:%M:%S %Z")

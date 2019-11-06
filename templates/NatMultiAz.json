@@ -464,6 +464,7 @@
     },
     "Resources": {
         "NatSecurityGroup": {
+            "Condition": "CreateSecurityGroup",
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
                 "GroupDescription": "ssh",
@@ -542,25 +543,8 @@
                 ]
             }
         },
-        "NatProfile": {
-            "Type": "AWS::IAM::InstanceProfile",
-            "Properties": {
-                "Roles": [
-                    {
-                        "Fn::If": [
-                            "CreateIAMRole",
-                            {
-                                "Ref": "NatRole"
-                            },
-                            {
-                                "Ref": "AlternativeIAMRole"
-                            }
-                        ]
-                    }
-                ]
-            }
-        },
         "NatRole": {
+            "Condition": "CreateIAMRole",
             "Type": "AWS::IAM::Role",
             "Properties": {
                 "AssumeRolePolicyDocument": {
@@ -655,6 +639,24 @@
                 ]
             }
         },
+        "NatProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Roles": [
+                    {
+                        "Fn::If": [
+                            "CreateIAMRole",
+                            {
+                                "Ref": "NatRole"
+                            },
+                            {
+                                "Ref": "AlternativeIAMRole"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
         "NatScalingGroup": {
             "Type": "AWS::AutoScaling::AutoScalingGroup",
             "Properties": {
@@ -690,24 +692,6 @@
                         "PropagateAtLaunch": true
                     }
                 ]
-            },
-            "CreationPolicy": {
-              "ResourceSignal": {
-                "Count": {
-                    "Ref": "InstanceCapacity"
-                },
-                "Timeout": "PT15M"
-              }
-            },
-            "UpdatePolicy": {
-                "AutoScalingRollingUpdate": {
-                    "MinInstancesInService": {
-                        "Ref": "InstanceCapacity"
-                    },
-                    "MaxBatchSize": "1",
-                    "PauseTime": "PT15M",
-                    "WaitOnResourceSignals": "true"
-                }
             }
         },
         "LaunchConfig": {
@@ -825,6 +809,7 @@
                 "IamInstanceProfile": {
                     "Ref": "NatProfile"
                 },
+                "KeyName": "IntelliPointWP",
                 "SecurityGroups": [
                     {
                         "Fn::If": [
