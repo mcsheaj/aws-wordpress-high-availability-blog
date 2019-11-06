@@ -692,6 +692,24 @@
                         "PropagateAtLaunch": true
                     }
                 ]
+            },
+            "CreationPolicy": {
+              "ResourceSignal": {
+                "Count": {
+                    "Ref": "InstanceCapacity"
+                },
+                "Timeout": "PT15M"
+              }
+            },
+            "UpdatePolicy": {
+                "AutoScalingRollingUpdate": {
+                    "MinInstancesInService": {
+                        "Ref": "InstanceCapacity"
+                    },
+                    "MaxBatchSize": "1",
+                    "PauseTime": "PT15M",
+                    "WaitOnResourceSignals": "true"
+                }
             }
         },
         "LaunchConfig": {
@@ -809,7 +827,6 @@
                 "IamInstanceProfile": {
                     "Ref": "NatProfile"
                 },
-                "KeyName": "IntelliPointWP",
                 "SecurityGroups": [
                     {
                         "Fn::If": [
@@ -830,7 +847,7 @@
                             [
                                 "#!/bin/bash -xe\n",
                                 "\n",
-                                "echo UserDataVersion=1",
+                                "echo UserDataVersion=2",
                                 "\n",
                                 "export ADMIN_GROUP=",
                                 {
