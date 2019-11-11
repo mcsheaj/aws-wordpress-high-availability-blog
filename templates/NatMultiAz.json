@@ -470,7 +470,7 @@
             "Condition": "CreateSecurityGroup",
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
-                "GroupDescription": "ssh",
+                "GroupDescription": "Allow web traffic for updates through NAT, and SSH from local addresses.",
                 "VpcId": {
                     "Ref": "VpcId"
                 },

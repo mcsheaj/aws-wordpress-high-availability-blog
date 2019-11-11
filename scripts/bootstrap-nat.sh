@@ -29,8 +29,6 @@ yum -y install jq
 # Populate some variables from CLI (need jq first)
 NAME=$(aws ec2 describe-tags --region us-east-1 --filters "Name=key,Values=Name" "Name=resource-id,Values=$INSTANCE_ID" --output json | jq .Tags[0].Value -r)
 STACK_NAME=$(aws ec2 describe-tags --region us-east-1 --filters "Name=key,Values=StackName" "Name=resource-id,Values=$INSTANCE_ID" --output json | jq .Tags[0].Value -r)
-MAC_ADDRESS=$(curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/)
-VPC_CIDR=$(curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/vpc-ipv4-cidr-block)
 
 # Update the motd banner
 if ! [ -z "${MOTD_BANNER}" ]
@@ -63,6 +61,10 @@ yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarc
 
 # Install iptables-service and fail2ban from the epel repo
 yum -y install iptables-services fail2ban
+
+# Get the VPC CIDR from metadata
+MAC_ADDRESS=$(curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/)
+VPC_CIDR=$(curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/vpc-ipv4-cidr-block)
 
 # Enable iptables to start on boot, and start it now
 systemctl enable iptables
@@ -99,8 +101,7 @@ mv aws-auto-healing-nat.sh /sbin
 chmod 700 /sbin/aws-auto-healing-nat.sh
 /sbin/aws-auto-healing-nat.sh
 
-# Re-enable nat and reset the private route tables on boot
-echo "iptables -t nat -A POSTROUTING -o eth0 -s ${VPC_CIDR} -j MASQUERADE" >> /etc/rc.d/rc.local
+# Reset the private route tables on boot
 echo "/sbin/aws-auto-healing-nat.sh" >> /etc/rc.d/rc.local
 chmod 700 /etc/rc.d/rc.local
 

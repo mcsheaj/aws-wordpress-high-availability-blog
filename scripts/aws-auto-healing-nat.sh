@@ -38,20 +38,22 @@ done
 # Determine route tables that need to use NAT for the same VPC
 ROUTE_TABLES=$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:${TAG_KEY},Values=${TAG_VALUE}" --region ${REGION} --output json | jq .RouteTables[].RouteTableId -r)
 
+# For each route table in route tables
 for ROUTE_TABLE  in ${ROUTE_TABLES}
 do
+   # Get the instance IDs of the default router on each private subnet
    TARGET=$(aws ec2 describe-route-tables --filters "Name=route-table-id,Values=${ROUTE_TABLE}" --region ${REGION} --output json | jq '.RouteTables[].Routes[] | select(.DestinationCidrBlock == "0.0.0.0/0")' | jq .InstanceId -r)
 
    echo "Checking ${ROUTE_TABLE}"
-   if [ "${TARGET}" = "" ]; then
+   if [ "${TARGET}" = "" ]; then # if there is no default router
       # Create default route 
       echo "No default route is detected. Creating default route for ${ROUTE_TABLE}"
       aws ec2 create-route --route-table-id ${ROUTE_TABLE} --destination-cidr-block 0.0.0.0/0 --instance-id ${INSTANCE_ID} --region ${REGION}
-   elif [ "${TARGET}" != "${INSTANCE_ID}" ]; then
+   elif [ "${TARGET}" != "${INSTANCE_ID}" ]; then # if the default router is not me
       # Replace default route
       echo "Default route is set to ${TARGET}. Replacing default route to ${INSTANCE_ID}"
       aws ec2 replace-route --route-table-id ${ROUTE_TABLE} --destination-cidr-block 0.0.0.0/0 --instance-id ${INSTANCE_ID} --region ${REGION}
-   else
+   else # if this instance is already the default router
       echo "No change is required"
    fi
 
