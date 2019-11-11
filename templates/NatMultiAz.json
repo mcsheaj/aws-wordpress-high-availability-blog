@@ -75,9 +75,12 @@
             "ConstraintDescription": "Must be the VPC Id of an existing Virtual Private Cloud."
         },
         "VpcCidr": {
-            "Type": "String",
             "Description": "the CIDR address range of the Virtual Private Cloud (VPC)",
-            "ConstraintDescription": "Must be the VPC CIDR range of an existing Virtual Private Cloud."
+            "Type": "String",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
         },
         "PublicSubnets": {
             "Type": "List<AWS::EC2::Subnet::Id>",
@@ -552,72 +555,70 @@
                     "Statement": [
                         {
                             "Effect": "Allow",
+                            "Action": "sts:AssumeRole",
                             "Principal": {
                                 "Service": "ec2.amazonaws.com"
-                            },
-                            "Action": "sts:AssumeRole"
+                            }
                         }
                     ]
                 },
                 "Path": "/",
                 "Policies": [
                     {
-                        "PolicyName": "IP_Nat_Iam",
+                        "PolicyName": "IP_Bastion_Iam",
                         "PolicyDocument": {
                             "Version": "2012-10-17",
                             "Statement": [
                                 {
-                                    "Effect": "Allow",
                                     "Action": "iam:ListUsers",
-                                    "Resource": "*"
+                                    "Resource": "*",
+                                    "Effect": "Allow"
                                 },
                                 {
-                                    "Effect": "Allow",
                                     "Action": [
                                         "iam:ListSSHPublicKeys",
                                         "iam:GetSSHPublicKey"
                                     ],
                                     "Resource": {
                                         "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:user/*"
-                                    }
+                                    },
+                                    "Effect": "Allow"
                                 },
                                 {
-                                    "Effect": "Allow",
                                     "Action": "iam:GetGroup",
-                                    "Resource": {
-                                        "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:group/${AdministratorsGroup}"
-                                    }
+                                    "Resource": "*",
+                                    "Effect": "Allow"
                                 }
                             ]
                         }
                     },
                     {
-                        "PolicyName": "IP_Nat_Ec2",
+                        "PolicyName": "IP_Bastion_Ec2",
                         "PolicyDocument": {
                             "Version": "2012-10-17",
                             "Statement": [
                                 {
-                                    "Effect": "Allow",
                                     "Action": [
                                         "ec2:DescribeTags",
                                         "ec2:ModifyInstanceAttribute",
                                         "ec2:DescribeRouteTables"
                                     ],
-                                    "Resource": "*"
+                                    "Resource": "*",
+                                    "Effect": "Allow"
                                 },
                                 {
-                                    "Effect": "Allow",
-                                    "Action": [
-                                        "ec2:CreateTags"
-                                    ],
-                                    "Resource": "*",
                                     "Condition": {
                                         "StringEquals": {
                                             "ec2:ResourceTag/StackName": {
                                                 "Fn::Sub": "${AWS::StackName}"
                                             }
                                         }
-                                    }
+                                    },
+                                    "Action": [
+                                        "ec2:CreateTags"
+                                    ],
+                                    "Resource": "*",
+                                    "Effect": "Allow"
                                 },
                                 {
                                     "Effect": "Allow",
