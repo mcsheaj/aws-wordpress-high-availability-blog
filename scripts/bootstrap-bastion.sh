@@ -49,10 +49,6 @@ else
     NEW_NAME=${NAME}
 fi
 
-# Move sshd to port 443
-sed -i "s/#Port 22/Port 443/" /etc/ssh/sshd_config
-systemctl restart sshd
-
 # Install the RedHat epel yum repo
 yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 
@@ -63,6 +59,13 @@ yum -y install iptables-services fail2ban
 systemctl enable iptables
 systemctl start iptables
 
+# Flush iptables
+iptables -F
+
+# Move sshd to port 443
+sed -i "s/#Port 22/Port 443/" /etc/ssh/sshd_config
+systemctl restart sshd
+
 # Configure iptables:
 # 1. accept anything on the loopback adapter
 # 2. accept incoming packets that belong to a connection that has already been established (using the state module)
@@ -70,13 +73,16 @@ systemctl start iptables
 # 3. accept tcp on port 443 (where we're running sshd)
 # 4. drop anything else
 # and persist the config
-iptables -F
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 iptables -A INPUT -p udp --dport 67:68 --sport 67:68 -j ACCEPT
 iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
 iptables -A INPUT -j DROP
 iptables-save > /etc/sysconfig/iptables
+
+# Shutdown RPC bind (used for NFS, not need on this server)
+systemctl stop rpcbind
+systemctl disable rpcbind
 
 # Enable fail2ban to start on boot, and start it now
 systemctl enable fail2ban
@@ -92,10 +98,6 @@ sed -i "s/maxretry = 5/maxretry = 3/" /etc/fail2ban/jail.local
 sed -i "s/^\[sshd\]/[sshd]\nenabled=true/" /etc/fail2ban/jail.local
 sed -i "s/port *= *ssh/port    = 443/" /etc/fail2ban/jail.local
 systemctl restart fail2ban
-
-# Shutdown RPC bind (used for NFS, not need on this server)
-systemctl stop rpcbind
-systemctl disable rpcbind
 
 # Run system updates
 yum -y update

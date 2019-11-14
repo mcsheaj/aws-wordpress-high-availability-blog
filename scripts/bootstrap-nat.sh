@@ -49,22 +49,11 @@ else
     NEW_NAME=${NAME}
 fi
 
-# Disable source/destination IP check so forwarding will work
-aws ec2 modify-instance-attribute --instance-id ${INSTANCE_ID} --source-dest-check "{\"Value\": false}" --region ${REGION}
-
-# Turn on IPV4 forwarding
-echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
-sysctl -p
-
 # Install the RedHat epel yum repo
 yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 
 # Install iptables-service and fail2ban from the epel repo
 yum -y install iptables-services fail2ban
-
-# Get the VPC CIDR from metadata
-MAC_ADDRESS=$(curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/)
-VPC_CIDR=$(curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/vpc-ipv4-cidr-block)
 
 # Enable iptables to start on boot, and start it now
 systemctl enable iptables
@@ -72,6 +61,17 @@ systemctl start iptables
 
 # Flush iptables
 iptables -F
+
+# Disable source/destination IP check so forwarding will work
+aws ec2 modify-instance-attribute --instance-id ${INSTANCE_ID} --source-dest-check "{\"Value\": false}" --region ${REGION}
+
+# Turn on IPV4 forwarding
+echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+sysctl -p
+
+# Get the VPC CIDR from metadata
+MAC_ADDRESS=$(curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/)
+VPC_CIDR=$(curl http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/vpc-ipv4-cidr-block)
 
 # Enable nat in iptables for our VPC CIDDR
 iptables -t nat -A POSTROUTING -o eth0 -s ${VPC_CIDR} -j MASQUERADE
