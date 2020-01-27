@@ -642,7 +642,7 @@
                 "HealthCheckPort": "80",
                 "HealthCheckProtocol": "HTTP",
                 "Matcher": {
-                    "HttpCode" : "200"
+                    "HttpCode": "200"
                 },
                 "Port": 80,
                 "Protocol": "HTTP",
@@ -833,15 +833,15 @@
                 "VPCZoneIdentifier": {
                     "Ref": "PrivateSubnets"
                 },
-                "LaunchTemplate":{
-                    "LaunchTemplateId":{
-                      "Ref":"LaunchTemplate"
+                "LaunchTemplate": {
+                    "LaunchTemplateId": {
+                        "Ref": "LaunchTemplate"
                     },
-                    "Version":{
-                      "Fn::GetAtt":[
-                        "LaunchTemplate",
-                        "LatestVersionNumber"
-                      ]
+                    "Version": {
+                        "Fn::GetAtt": [
+                            "LaunchTemplate",
+                            "LatestVersionNumber"
+                        ]
                     }
                 },
                 "HealthCheckType": "ELB",
@@ -877,12 +877,12 @@
                 ]
             },
             "CreationPolicy": {
-              "ResourceSignal": {
-                "Count": {
-                    "Ref": "WebServerCapacity"
-                },
-                "Timeout": "PT15M"
-              }
+                "ResourceSignal": {
+                    "Count": {
+                        "Ref": "WebServerCapacity"
+                    },
+                    "Timeout": "PT15M"
+                }
             },
             "UpdatePolicy": {
                 "AutoScalingRollingUpdate": {
@@ -961,12 +961,12 @@
                                 },
                                 "mode": "000700",
                                 "owner": "root",
-                                "group": "root"              
+                                "group": "root"
                             }
                         },
-                        "commands" : {
-                            "aws_update_bastion" : {
-                                "command" : "/sbin/aws-update-wordpress.sh MetadataVersion=1"
+                        "commands": {
+                            "aws_update_bastion": {
+                                "command": "/sbin/aws-update-wordpress.sh MetadataVersion=1"
                             }
                         },
                         "services": {
@@ -986,93 +986,102 @@
                 }
             },
             "Properties": {
-                "ImageId": {
-                    "Fn::FindInMap": [
-                        "Region2ArchitectureAmi",
+                "LaunchTemplateName": {
+                    "Fn::Sub": "LaunchTemplate_${AWS::StackName}"
+                },
+                "LaunchTemplateData": {
+                    "ImageId": {
+                        "Fn::FindInMap": [
+                            "Region2ArchitectureAmi",
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            {
+                                "Fn::FindInMap": [
+                                    "InstanceType2Architecture",
+                                    {
+                                        "Ref": "InstanceType"
+                                    },
+                                    "Arch"
+                                ]
+                            }
+                        ]
+                    },
+                    "InstanceType": {
+                        "Ref": "InstanceType"
+                    },
+                    "Monitoring": {
+                        "Enabled": false
+                    },
+                    "IamInstanceProfile": {
+                        "Name": { 
+                            "Ref": "WordPressProfile"
+                        }
+                    },
+                    "SecurityGroupIds": [
                         {
-                            "Ref": "AWS::Region"
-                        },
-                        {
-                            "Fn::FindInMap": [
-                                "InstanceType2Architecture",
-                                {
-                                    "Ref": "InstanceType"
-                                },
-                                "Arch"
+                            "Ref": "WordPressSG"
+                        }
+                    ],
+                    "KeyName": {
+                        "Ref": "KeyName"
+                    },
+                    "UserData": {
+                        "Fn::Base64": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    "#!/bin/bash -xe\n",
+                                    "\n",
+                                    "echo UserDataVersion=1",
+                                    "\n",
+                                    "# Create bootstrap properties in the root account home\n",
+                                    "mkdir -p /root/.aws\n",
+                                    "chmod 700 /root/.aws\n",
+                                    "cat << EOF > /root/.aws/bootstrap.properties\n",
+                                    "ADMIN_GROUP=",
+                                    {
+                                        "Ref": "AdministratorsGroup"
+                                    },
+                                    "\n",
+                                    "MOTD_BANNER=",
+                                    {
+                                        "Ref": "MotdBanner"
+                                    },
+                                    "\n",
+                                    "DB_USER=",
+                                    {
+                                        "Ref": "DBUser"
+                                    },
+                                    "\n",
+                                    "DB_PASSWORD=",
+                                    {
+                                        "Ref": "DBPassword"
+                                    },
+                                    "\n",
+                                    "DB_DATABASE=",
+                                    {
+                                        "Ref": "DBName"
+                                    },
+                                    "\n",
+                                    "DB_SERVER=",
+                                    {
+                                        "Fn::GetAtt": [
+                                            "DBInstance",
+                                            "Endpoint.Address"
+                                        ]
+                                    },
+                                    "\n",
+                                    "EOF\n",
+                                    "chmod 600 /root/.aws/bootstrap.properties\n",
+                                    "\n",
+                                    "wget --no-cache -O /tmp/bootstrap-wordpress.sh https://raw.githubusercontent.com/mcsheaj/wordpress-high-availability-blog/master/scripts/bootstrap-wordpress.sh  \n",
+                                    "chmod 700 /tmp/bootstrap-wordpress.sh\n",
+                                    "/tmp/bootstrap-wordpress.sh",
+                                    "\n"
+                                ]
                             ]
                         }
-                    ]
-                },
-                "InstanceType": {
-                    "Ref": "InstanceType"
-                },
-                "InstanceMonitoring": false,
-                "IamInstanceProfile": {
-                    "Ref": "WordPressProfile"
-                },
-                "SecurityGroups": [
-                    {
-                        "Ref": "WordPressSG"
-                    }
-                ],
-                "KeyName": {
-                    "Ref": "KeyName"
-                },
-                "UserData": {
-                    "Fn::Base64": {
-                        "Fn::Join": [
-                            "",
-                            [
-                                "#!/bin/bash -xe\n",
-                                "\n",
-                                "echo UserDataVersion=1",
-                                "\n",
-                                "# Create bootstrap properties in the root account home\n",
-                                "mkdir -p /root/.aws\n",
-                                "chmod 700 /root/.aws\n",
-                                "cat << EOF > /root/.aws/bootstrap.properties\n",
-                                "ADMIN_GROUP=",
-                                {
-                                    "Ref": "AdministratorsGroup"
-                                },
-                                "\n",
-                                "MOTD_BANNER=",
-                                {
-                                    "Ref": "MotdBanner"
-                                },
-                                "\n",
-                                "DB_USER=",
-                                {
-                                    "Ref": "DBUser"
-                                },
-                                "\n",
-                                "DB_PASSWORD=",
-                                {
-                                    "Ref": "DBPassword"
-                                },
-                                "\n",
-                                "DB_DATABASE=",
-                                {
-                                    "Ref": "DBName"
-                                },
-                                "\n",
-                                "DB_SERVER=",
-                                {
-                                    "Fn::GetAtt": [
-                                        "DBInstance",
-                                        "Endpoint.Address"
-                                    ]
-                                },
-                                "\n",
-                                "EOF\n",
-                                "chmod 600 /root/.aws/bootstrap.properties\n",
-                                "\n",
-                                "wget --no-cache -O /tmp/bootstrap-wordpress.sh https://raw.githubusercontent.com/mcsheaj/wordpress-high-availability-blog/master/scripts/bootstrap-wordpress.sh  \n",
-                                "chmod 700 /tmp/bootstrap-wordpress.sh\n",
-                                "/tmp/bootstrap-wordpress.sh",
-                                "\n"
-                            ]
-                        ]
                     }
                 }
             }
