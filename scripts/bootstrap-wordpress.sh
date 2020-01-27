@@ -46,8 +46,11 @@ DB_PASSWORD=$(awk -F "=" '/DB_PASSWORD/ {print $2}' /root/.aws/bootstrap.propert
 DB_DATABASE=$(awk -F "=" '/DB_DATABASE/ {print $2}' /root/.aws/bootstrap.properties)
 DB_SERVER=$(awk -F "=" '/DB_SERVER/ {print $2}' /root/.aws/bootstrap.properties)
 
-# Install amazon linux extras lamp
+# Get the latest LAMP packages for AWS Linux 2
 amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
+
+# Install apache
+yum install -y httpd
 
 # Install php-xml
 yum install -y php-xml.*
