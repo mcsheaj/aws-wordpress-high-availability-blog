@@ -58,9 +58,6 @@ yum install -y php-xml.*
 # Remove this later
 echo "<?php phpinfo() ?>" > /var/www/html/info.php
 
-# Configure apache for index.php
-#sed -i "s/DirectoryIndex/DirectoryIndex index.php/" /etc/apache2/mods-enabled/dir.conf
-
 # Download wordpress and install it in /var/www/html
 cd /tmp
 wget -O /tmp/latest.tar.gz http://wordpress.org/latest.tar.gz
