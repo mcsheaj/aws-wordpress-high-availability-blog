@@ -875,24 +875,6 @@
                         "PropagateAtLaunch": true
                     }
                 ]
-            },
-            "CreationPolicy": {
-                "ResourceSignal": {
-                    "Count": {
-                        "Ref": "WebServerCapacity"
-                    },
-                    "Timeout": "PT15M"
-                }
-            },
-            "UpdatePolicy": {
-                "AutoScalingRollingUpdate": {
-                    "MinInstancesInService": {
-                        "Ref": "WebServerCapacity"
-                    },
-                    "MaxBatchSize": "1",
-                    "PauseTime": "PT15M",
-                    "WaitOnResourceSignals": "true"
-                }
             }
         },
         "LaunchTemplate": {
