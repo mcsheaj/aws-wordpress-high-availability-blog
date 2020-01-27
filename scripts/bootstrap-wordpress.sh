@@ -55,8 +55,8 @@ yum install -y httpd
 # Install php-xml
 yum install -y php-xml.*
 
+# Remove this later
 echo "<?php phpinfo() ?>" > /var/www/html/info.php
-echo "<html><head><title>Coming Soon</title></head><body><h2>Coming Soon</h2></body></html>" > /var/www/html/index.html
 
 # Configure apache for index.php
 #sed -i "s/DirectoryIndex/DirectoryIndex index.php/" /etc/apache2/mods-enabled/dir.conf
