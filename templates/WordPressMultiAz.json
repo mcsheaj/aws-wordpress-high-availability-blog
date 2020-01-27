@@ -187,7 +187,7 @@
             "ConstraintDescription": "must be a valid EC2 instance type."
         },
         "WebServerCapacity": {
-            "Default": "2",
+            "Default": "1",
             "Description": "The initial number of WebServer instances. This will be both the minimum and desired number of the web server auto scaling group. Currently constrained from 1 to 5.",
             "Type": "Number",
             "MinValue": "1",
@@ -829,6 +829,148 @@
         },
         "WordPressScalingGroup": {
             "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "VPCZoneIdentifier": {
+                    "Ref": "PrivateSubnets"
+                },
+                "LaunchTemplate": {
+                    "LaunchTemplateId": {
+                        "Ref": "LaunchTemplate"
+                    },
+                    "Version": {
+                        "Fn::GetAtt": [
+                            "LaunchTemplate",
+                            "LatestVersionNumber"
+                        ]
+                    }
+                },
+                "HealthCheckType": "ELB",
+                "HealthCheckGracePeriod": "300",
+                "MinSize": "1",
+                "MaxSize": "5",
+                "DesiredCapacity": {
+                    "Ref": "WebServerCapacity"
+                },
+                "TargetGroupARNs": [
+                    {
+                        "Ref": "ALBTargetGroup"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "WordPress",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "StackName",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName}"
+                        },
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Private",
+                        "PropagateAtLaunch": true
+                    }
+                ]
+            },
+            "CreationPolicy": {
+              "ResourceSignal": {
+                "Count": {
+                    "Ref": "WebServerCapacity"
+                },
+                "Timeout": "PT15M"
+              }
+            },
+            "UpdatePolicy": {
+                "AutoScalingRollingUpdate": {
+                    "MinInstancesInService": {
+                        "Ref": "WebServerCapacity"
+                    },
+                    "MaxBatchSize": "1",
+                    "PauseTime": "PT15M",
+                    "WaitOnResourceSignals": "true"
+                }
+            }
+        },
+        "WordPressScaleUp": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "WordPressScalingGroup"
+                },
+                "Cooldown": "300",
+                "ScalingAdjustment": "1"
+            }
+        },
+        "WordPressScaleDown": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "WordPressScalingGroup"
+                },
+                "Cooldown": "300",
+                "ScalingAdjustment": "-1"
+            }
+        },
+        "CpuHigh": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Scale-up if CPU > 60% for 10 minutes",
+                "MetricName": "CPUUtilization",
+                "Namespace": "AWS/EC2",
+                "Statistic": "Average",
+                "Period": "300",
+                "EvaluationPeriods": "2",
+                "Threshold": "300",
+                "AlarmActions": [
+                    {
+                        "Ref": "WordPressScaleUp"
+                    }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "AutoScalingGroupName",
+                        "Value": {
+                            "Ref": "WordPressScalingGroup"
+                        }
+                    }
+                ],
+                "ComparisonOperator": "GreaterThanThreshold"
+            }
+        },
+        "CpuLow": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Scale-down if CPU < 30% for 15 minutes",
+                "MetricName": "CPUUtilization",
+                "Namespace": "AWS/EC2",
+                "Statistic": "Average",
+                "Period": "300",
+                "EvaluationPeriods": "3",
+                "Threshold": "30",
+                "AlarmActions": [
+                    {
+                        "Ref": "WordPressScaleDown"
+                    }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "AutoScalingGroupName",
+                        "Value": {
+                            "Ref": "WordPressScalingGroup"
+                        }
+                    }
+                ],
+                "ComparisonOperator": "LessThanThreshold"
+            }
+        },
+        "LaunchTemplate": {
+            "Type": "AWS::EC2::LaunchTemplate",
             "Metadata": {
                 "AWS::CloudFormation::Init": {
                     "configSets": {
@@ -917,148 +1059,6 @@
                     }
                 }
             },
-            "Properties": {
-                "VPCZoneIdentifier": {
-                    "Ref": "PrivateSubnets"
-                },
-                "LaunchTemplate": {
-                    "LaunchTemplateId": {
-                        "Ref": "LaunchTemplate"
-                    },
-                    "Version": {
-                        "Fn::GetAtt": [
-                            "LaunchTemplate",
-                            "LatestVersionNumber"
-                        ]
-                    }
-                },
-                "HealthCheckType": "ELB",
-                "HealthCheckGracePeriod": "300",
-                "MinSize": "1",
-                "MaxSize": "5",
-                "DesiredCapacity": {
-                    "Ref": "WebServerCapacity"
-                },
-                "TargetGroupARNs": [
-                    {
-                        "Ref": "ALBTargetGroup"
-                    }
-                ],
-                "Tags": [
-                    {
-                        "Key": "Name",
-                        "Value": "WordPress",
-                        "PropagateAtLaunch": true
-                    },
-                    {
-                        "Key": "StackName",
-                        "Value": {
-                            "Fn::Sub": "${AWS::StackName}"
-                        },
-                        "PropagateAtLaunch": true
-                    },
-                    {
-                        "Key": "Network",
-                        "Value": "Private",
-                        "PropagateAtLaunch": true
-                    }
-                ]
-            },
-            "CreationPolicy": {
-              "ResourceSignal": {
-                "Count": {
-                    "Ref": "WebServerCapacity"
-                },
-                "Timeout": "PT15M"
-              }
-            },
-            "UpdatePolicy": {
-                "AutoScalingRollingUpdate": {
-                    "MinInstancesInService": {
-                        "Ref": "WebServerCapacity"
-                    },
-                    "MaxBatchSize": "1",
-                    "PauseTime": "PT15M",
-                    "WaitOnResourceSignals": "true"
-                }
-            }
-        },
-        "WordPressScaleUp": {
-            "Type": "AWS::AutoScaling::ScalingPolicy",
-            "Properties": {
-                "AdjustmentType": "ChangeInCapacity",
-                "AutoScalingGroupName": {
-                    "Ref": "WordPressScalingGroup"
-                },
-                "Cooldown": "60",
-                "ScalingAdjustment": "1"
-            }
-        },
-        "WordPressScaleDown": {
-            "Type": "AWS::AutoScaling::ScalingPolicy",
-            "Properties": {
-                "AdjustmentType": "ChangeInCapacity",
-                "AutoScalingGroupName": {
-                    "Ref": "WordPressScalingGroup"
-                },
-                "Cooldown": "300",
-                "ScalingAdjustment": "-1"
-            }
-        },
-        "CpuHigh": {
-            "Type": "AWS::CloudWatch::Alarm",
-            "Properties": {
-                "AlarmDescription": "Scale-up if CPU > 60% for 3 minutes",
-                "MetricName": "CPUUtilization",
-                "Namespace": "AWS/EC2",
-                "Statistic": "Average",
-                "Period": "60",
-                "EvaluationPeriods": "3",
-                "Threshold": "60",
-                "AlarmActions": [
-                    {
-                        "Ref": "WordPressScaleUp"
-                    }
-                ],
-                "Dimensions": [
-                    {
-                        "Name": "AutoScalingGroupName",
-                        "Value": {
-                            "Ref": "WordPressScalingGroup"
-                        }
-                    }
-                ],
-                "ComparisonOperator": "GreaterThanThreshold"
-            }
-        },
-        "CpuLow": {
-            "Type": "AWS::CloudWatch::Alarm",
-            "Properties": {
-                "AlarmDescription": "Scale-down if CPU < 30% for 3 minutes",
-                "MetricName": "CPUUtilization",
-                "Namespace": "AWS/EC2",
-                "Statistic": "Average",
-                "Period": "60",
-                "EvaluationPeriods": "3",
-                "Threshold": "30",
-                "AlarmActions": [
-                    {
-                        "Ref": "WordPressScaleDown"
-                    }
-                ],
-                "Dimensions": [
-                    {
-                        "Name": "AutoScalingGroupName",
-                        "Value": {
-                            "Ref": "WordPressScalingGroup"
-                        }
-                    }
-                ],
-                "ComparisonOperator": "LessThanThreshold"
-            }
-        },
-        "LaunchTemplate": {
-            "Type": "AWS::EC2::LaunchTemplate",
             "Properties": {
                 "LaunchTemplateName": {
                     "Fn::Sub": "LaunchTemplate_${AWS::StackName}"
