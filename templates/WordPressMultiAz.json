@@ -887,80 +887,6 @@
                 }
             }
         },
-        "WordPressScaleUp": {
-            "Type": "AWS::AutoScaling::ScalingPolicy",
-            "Properties": {
-                "AdjustmentType": "ChangeInCapacity",
-                "AutoScalingGroupName": {
-                    "Ref": "WordPressScalingGroup"
-                },
-                "Cooldown": "300",
-                "ScalingAdjustment": "1"
-            }
-        },
-        "WordPressScaleDown": {
-            "Type": "AWS::AutoScaling::ScalingPolicy",
-            "Properties": {
-                "AdjustmentType": "ChangeInCapacity",
-                "AutoScalingGroupName": {
-                    "Ref": "WordPressScalingGroup"
-                },
-                "Cooldown": "300",
-                "ScalingAdjustment": "-1"
-            }
-        },
-        "CpuHigh": {
-            "Type": "AWS::CloudWatch::Alarm",
-            "Properties": {
-                "AlarmDescription": "Scale-up if CPU > 60% for 10 minutes",
-                "MetricName": "CPUUtilization",
-                "Namespace": "AWS/EC2",
-                "Statistic": "Average",
-                "Period": "300",
-                "EvaluationPeriods": "2",
-                "Threshold": "300",
-                "AlarmActions": [
-                    {
-                        "Ref": "WordPressScaleUp"
-                    }
-                ],
-                "Dimensions": [
-                    {
-                        "Name": "AutoScalingGroupName",
-                        "Value": {
-                            "Ref": "WordPressScalingGroup"
-                        }
-                    }
-                ],
-                "ComparisonOperator": "GreaterThanThreshold"
-            }
-        },
-        "CpuLow": {
-            "Type": "AWS::CloudWatch::Alarm",
-            "Properties": {
-                "AlarmDescription": "Scale-down if CPU < 30% for 15 minutes",
-                "MetricName": "CPUUtilization",
-                "Namespace": "AWS/EC2",
-                "Statistic": "Average",
-                "Period": "300",
-                "EvaluationPeriods": "3",
-                "Threshold": "30",
-                "AlarmActions": [
-                    {
-                        "Ref": "WordPressScaleDown"
-                    }
-                ],
-                "Dimensions": [
-                    {
-                        "Name": "AutoScalingGroupName",
-                        "Value": {
-                            "Ref": "WordPressScalingGroup"
-                        }
-                    }
-                ],
-                "ComparisonOperator": "LessThanThreshold"
-            }
-        },
         "LaunchTemplate": {
             "Type": "AWS::EC2::LaunchTemplate",
             "Metadata": {
@@ -1148,6 +1074,80 @@
                         }
                     }
                 }
+            }
+        },
+        "WordPressScaleUp": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "WordPressScalingGroup"
+                },
+                "Cooldown": "300",
+                "ScalingAdjustment": "1"
+            }
+        },
+        "WordPressScaleDown": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "WordPressScalingGroup"
+                },
+                "Cooldown": "300",
+                "ScalingAdjustment": "-1"
+            }
+        },
+        "CpuHigh": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Scale-up if CPU > 60% for 10 minutes",
+                "MetricName": "CPUUtilization",
+                "Namespace": "AWS/EC2",
+                "Statistic": "Average",
+                "Period": "300",
+                "EvaluationPeriods": "2",
+                "Threshold": "300",
+                "AlarmActions": [
+                    {
+                        "Ref": "WordPressScaleUp"
+                    }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "AutoScalingGroupName",
+                        "Value": {
+                            "Ref": "WordPressScalingGroup"
+                        }
+                    }
+                ],
+                "ComparisonOperator": "GreaterThanThreshold"
+            }
+        },
+        "CpuLow": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Scale-down if CPU < 30% for 15 minutes",
+                "MetricName": "CPUUtilization",
+                "Namespace": "AWS/EC2",
+                "Statistic": "Average",
+                "Period": "300",
+                "EvaluationPeriods": "3",
+                "Threshold": "30",
+                "AlarmActions": [
+                    {
+                        "Ref": "WordPressScaleDown"
+                    }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "AutoScalingGroupName",
+                        "Value": {
+                            "Ref": "WordPressScalingGroup"
+                        }
+                    }
+                ],
+                "ComparisonOperator": "LessThanThreshold"
             }
         },
         "DbWordPressSG": {
