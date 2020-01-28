@@ -44,7 +44,6 @@
                     },
                     "Parameters": [
                         "AdministratorsGroup",
-                        "KeyName",
                         "MotdBanner"
                     ]
                 }
@@ -88,9 +87,6 @@
                 },
                 "AdministratorsGroup": {
                     "default": "Admin IAM Group"
-                },
-                "KeyName": {
-                    "default": "Key Pair"
                 },
                 "MotdBanner": {
                     "default": "Login Banner URL"
@@ -284,10 +280,6 @@
             "Type": "String",
             "Description": "Name of an IAM group from which user accounts will be created and keys copied if they've configured a CodeCommit key (required). I'd prefer to only pull IAM accounts from a particular IAM group, so this template won't even work if this isn't the name of a real IAM group (or at least, aws-ec2-ssh won't work).",
             "ConstraintDescription": "must be the name of a valid IAM group, and if none of the users have CodeCommit keys there will be no way to connect to instances"
-        },
-        "KeyName": {
-            "Description": "Enter a Public/private key pair to use for the ec2-user account. If you do not have one in this region, please create it before continuing. This is a fallback way to connect in case aws-ec2-ssh doesn't work and you need to debug it. Only one person should have the private key, and it and the ec2-user account should be deleted once you've confirmed that aws-ec2-ssh worked.",
-            "Type": "AWS::EC2::KeyPair::KeyName"
         },
         "MotdBanner": {
             "Default": "https://raw.githubusercontent.com/mcsheaj/aws-playground/master/scripts/motd.sh",
@@ -1097,9 +1089,6 @@
                             "Ref": "WordPressSG"
                         }
                     ],
-                    "KeyName": {
-                        "Ref": "KeyName"
-                    },
                     "UserData": {
                         "Fn::Base64": {
                             "Fn::Join": [
