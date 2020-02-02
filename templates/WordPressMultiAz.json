@@ -1107,7 +1107,7 @@
                 "Statistic": "Average",
                 "Period": "300",
                 "EvaluationPeriods": "2",
-                "Threshold": "300",
+                "Threshold": "50",
                 "AlarmActions": [
                     {
                         "Ref": "WordPressScaleUp"
@@ -1133,7 +1133,7 @@
                 "Statistic": "Average",
                 "Period": "300",
                 "EvaluationPeriods": "3",
-                "Threshold": "30",
+                "Threshold": "25",
                 "AlarmActions": [
                     {
                         "Ref": "WordPressScaleDown"
