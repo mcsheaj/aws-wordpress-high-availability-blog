@@ -83,6 +83,37 @@ printf '%s\n' "g/$STRING/d" a "$SALT" . w | ed -s wp-config.php
 # Lock down wp-config.php
 chmod 660 wp-config.php
 
+# Configure cache expiry for static content
+cat << EOF >> /var/www/html/.htaccess
+<IfModule mod_expires.c>
+ExpiresActive On
+
+# Images
+ExpiresByType image/jpeg "access plus 1 year"
+ExpiresByType image/gif "access plus 1 year"
+ExpiresByType image/png "access plus 1 year"
+ExpiresByType image/webp "access plus 1 year"
+ExpiresByType image/svg+xml "access plus 1 year"
+ExpiresByType image/x-icon "access plus 1 year"
+
+# Video
+ExpiresByType video/mp4 "access plus 1 year"
+ExpiresByType video/mpeg "access plus 1 year"
+
+# CSS, JavaScript
+ExpiresByType text/css "access plus 1 month"
+ExpiresByType text/javascript "access plus 1 month"
+ExpiresByType application/javascript "access plus 1 month"
+
+# Others
+ExpiresByType application/pdf "access plus 1 month"
+ExpiresByType application/x-shockwave-flash "access plus 1 month"
+</IfModule>
+EOF
+
+# Lock down .htaccess
+chmod 660 /var/www/html/.htaccess
+
 # Start the httpd service and configure it to start on boot
 systemctl enable httpd
 systemctl start httpd
