@@ -84,7 +84,18 @@ printf '%s\n' "g/$STRING/d" a "$SALT" . w | ed -s wp-config.php
 chmod 660 wp-config.php
 
 # Configure cache expiry for static content
-cat << EOF >> /var/www/html/.htaccess
+cat << EOF > /var/www/html/.htaccess
+# BEGIN WordPress
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+# END WordPress
+
 <IfModule mod_expires.c>
 ExpiresActive On
 
@@ -95,19 +106,20 @@ ExpiresByType image/png "access plus 1 year"
 ExpiresByType image/webp "access plus 1 year"
 ExpiresByType image/svg+xml "access plus 1 year"
 ExpiresByType image/x-icon "access plus 1 year"
+ExpiresByType image/x-icon "access 1 year"
 
 # Video
 ExpiresByType video/mp4 "access plus 1 year"
 ExpiresByType video/mpeg "access plus 1 year"
 
 # CSS, JavaScript
-ExpiresByType text/css "access plus 1 month"
-ExpiresByType text/javascript "access plus 1 month"
-ExpiresByType application/javascript "access plus 1 month"
+ExpiresByType text/css "access plus 1 year"
+ExpiresByType text/javascript "access plus 1 year"
+ExpiresByType application/javascript "access plus 1 year"
 
 # Others
-ExpiresByType application/pdf "access plus 1 month"
-ExpiresByType application/x-shockwave-flash "access plus 1 month"
+ExpiresByType application/pdf "access plus 1 year"
+ExpiresByType application/x-shockwave-flash "access plus 1 year"
 </IfModule>
 EOF
 
